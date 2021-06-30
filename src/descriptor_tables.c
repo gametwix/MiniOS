@@ -12,12 +12,14 @@
 // Lets us access our ASM functions from our C code.
 extern void gdt_flush(u32int);
 extern void idt_flush(u32int);
+extern void tss_flush();
 
 // Internal function prototypes.
 static void init_gdt();
 static void init_idt();
 static void gdt_set_gate(s32int,u32int,u32int,u8int,u8int);
 static void idt_set_gate(u8int,u32int,u16int,u8int);
+static void write_tss(s32int,u16int,u32int);
 
 gdt_entry_t gdt_entries[5];
 gdt_ptr_t   gdt_ptr;
@@ -27,11 +29,59 @@ idt_ptr_t   idt_ptr;
 // Extern the ISR handler array so we can nullify them on startup.
 extern isr_t interrupt_handlers[];
 
+tss_entry_t tss_entry;
+
+static void init_gdt()
+{
+   gdt_ptr.limit = (sizeof(gdt_entry_t) * 6) - 1;
+   gdt_ptr.base  = (u32int)&gdt_entries;
+
+   gdt_set_gate(0, 0, 0, 0, 0);                // Сегмент null
+   gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // Сегмент кода
+   gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // Сегмент данных
+   gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // Сегмент кода пользовательского режима
+   gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // Сегмент данных пользовательского режима
+   write_tss(5, 0x10, 0x0);
+
+   gdt_flush((u32int)&gdt_ptr);
+   tss_flush();
+}
+
+// Инициализируем нашу структуру сегмента состояния задачи.
+static void write_tss(s32int num, u16int ss0, u32int esp0)
+{
+   // Сначала давайте вычислим базу и предельное значение для нашей записи в таблице GDT.
+   u32int base = (u32int) &tss_entry;
+   u32int limit = base + sizeof(tss_entry);
+
+   // Теперь добавим в таблицу GDT  адрес дескриптора нашего TSS.
+   gdt_set_gate(num, base, limit, 0xE9, 0x00);
+
+   // Обеспечим, чтобы первоначально дескриптор был равен нулю.
+   memset(&tss_entry, 0, sizeof(tss_entry));
+
+   tss_entry.ss0  = ss0;  // Запоминаем сегмент стека ядра.
+   tss_entry.esp0 = esp0; // Запоминаем указатель стека ядра.
+
+   // Здесь заносим в таблицу TSS записи cs, ss, ds, es, fs и gs. В них указывается, какие сегменты
+   // должны быть загружены в случае,  когда процессор переключается в режим ядра. Поэтому
+   // они являются нашими обычными сегментами кода/данных ядра - 0x08 и 0x10 соответственно,
+   // но в последних двух битах будут указаны значения 0x0b и 0x13. Значения этих битов указывают,
+   // что уровень запрашиваемых привилегий RPL (requested privilege level) равен 3; это означает, что 
+   // этот сегмент TSS  можно использовать для переключения в режим ядра из кольца 3.
+   tss_entry.cs   = 0x0b;
+   tss_entry.ss = tss_entry.ds = tss_entry.es = tss_entry.fs = tss_entry.gs = 0x13;
+} 
+
+void set_kernel_stack(u32int stack)
+{
+   tss_entry.esp0 = stack;
+} 
+
 // Initialisation routine - zeroes all the interrupt service routines,
 // initialises the GDT and IDT.
 void init_descriptor_tables()
 {
-
     // Initialise the global descriptor table.
     init_gdt();
     // Initialise the interrupt descriptor table.
@@ -40,19 +90,19 @@ void init_descriptor_tables()
     memset(&interrupt_handlers, 0, sizeof(isr_t)*256);
 }
 
-static void init_gdt()
-{
-    gdt_ptr.limit = (sizeof(gdt_entry_t) * 5) - 1;
-    gdt_ptr.base  = (u32int)&gdt_entries;
+// static void init_gdt()
+// {
+//     gdt_ptr.limit = (sizeof(gdt_entry_t) * 5) - 1;
+//     gdt_ptr.base  = (u32int)&gdt_entries;
 
-    gdt_set_gate(0, 0, 0, 0, 0);                // Null segment
-    gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // Code segment
-    gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // Data segment
-    gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // User mode code segment
-    gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // User mode data segment
+//     gdt_set_gate(0, 0, 0, 0, 0);                // Null segment
+//     gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF); // Code segment
+//     gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF); // Data segment
+//     gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // User mode code segment
+//     gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // User mode data segment
 
-    gdt_flush((u32int)&gdt_ptr);
-}
+//     gdt_flush((u32int)&gdt_ptr);
+// }
 
 // Set the value of one GDT entry.
 static void gdt_set_gate(s32int num, u32int base, u32int limit, u8int access, u8int gran)

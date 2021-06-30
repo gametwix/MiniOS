@@ -3,7 +3,8 @@
 # The only one that needs changing is the assembler 
 # rule, as we use nasm instead of GNU as.
 
-OBJFILES=boot.o main.o monitor.o common.o descriptor_tables.o isr.o interrupt.o gdt.o timer.o
+OBJFILES=boot.o main.o monitor.o common.o descriptor_tables.o isr.o interrupt.o gdt.o timer.o \
+	kheap.o paging.o ordered_map.o task.o process.o
 
 CFLAGS  = -Wall -fno-builtin -fno-stack-protector -nostdinc -nostdlib -ggdb3 -m32
 ASFLAGS=-felf
