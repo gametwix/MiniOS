@@ -50,6 +50,8 @@ void *alloc(u32int size, u8int page_align, heap_t *heap);
 **/
 void free(void *p, heap_t *heap);
 
+u32int kmalloc_int(u32int sz, int align, u32int *phys);
+
 u32int kmalloc_a(u32int sz);  // выделяет страницу.
 u32int kmalloc_p(u32int sz, u32int *phys); // возвращает физический адрес.
 u32int kmalloc_ap(u32int sz, u32int *phys); // выделяет страницу и возвращает физический адрес.

@@ -94,75 +94,66 @@ void move_stack(void *new_stack_start, u32int size)
    asm volatile("mov %0, %%esp" : : "r" (new_stack_pointer));
    asm volatile("mov %0, %%ebp" : : "r" (new_base_pointer));
 }
-	
+
 void switch_task()
 {
-   //monitor_color_write("SWITCH_TACK", WHITE, RED);
-   // If we haven't initialised tasking yet, just return.
+   // Если у нас еще нет инициализированных задач, то просто выходим.
    if (!current_task)
-      return;
+       return;
 
-   // Read esp, ebp now for saving later on.
+   // Теперь читаем esp, ebp для того, чтобы их потом сохранить.
    u32int esp, ebp, eip;
    asm volatile("mov %%esp, %0" : "=r"(esp));
    asm volatile("mov %%ebp, %0" : "=r"(ebp));
 
-   // Read the instruction pointer. We do some cunning logic here:
-   // One of two things could have happened when this function exits - 
-   //   (a) We called the function and it returned the EIP as requested.
-   //   (b) We have just switched tasks, and because the saved EIP is essentially
-   //       the instruction after read_eip(), it will seem as if read_eip has just
-   //       returned.
-   // In the second case we need to return immediately. To detect it we put a dummy
-   // value in EAX further down at the end of this function. As C returns values in EAX,
-   // it will look like the return value is this dummy value! (0x12345).
+   // Читаем указатель инструкций. Здесь мы используем сложную логику:
+   // Когда происходит выход из этой функции, то возможен один из следующих двух случаев -
+   // (a) Мы вызвали функцию и она вернула значение EIP.
+   // (b) Мы только что переключили задачи и, поскольку сохраненным значением EIP, 
+   // в сущности,является инструкция, идущая за read_eip(), то будет все выглядеть так, 
+   // как если бы только что произошел выход из функции read_eip.
+   // Во втором случае нам нужно немедленно выйти из функции. Чтобы обнаружить эту ситуацию,  
+  // нам нужно поместить в EAX фиктивное значение, которое будет проверяться в конце работы
+   // нашей функции. Поскольку в языке C регистр EAX используется для возврата значений, будет
+   // выглядеть так, как будто бы возвращаемым значением будет это фиктивное значение! (0x12345).
    eip = read_eip();
 
-   // Have we just switched tasks?
+   // Только что выполнено переключение задач?
    if (eip == 0x12345)
       return;
 
-   //monitor_color_write("SWITCHING...", WHITE, RED);
-   // No, we didn't switch tasks. Let's save some register values and switch.
+   // Нет, переключение задач не выполнено. Давайте сохраним значения некоторых регистров и выполним переключение.
    current_task->eip = eip;
    current_task->esp = esp;
-   current_task->ebp = ebp;
-   
-   // Get the next task to run.
+   current_task->ebp = ebp; 
+
+   // Берем следующую задачу для запуска.
    current_task = current_task->next;
-   // If we fell off the end of the linked list start again at the beginning.
-   if (!current_task) current_task = ready_queue;
-
-   eip = current_task->eip;
+   // Если мы доходим до конца связного списка, то начинаем все сначала.
+   if (!current_task) current_task = ready_queue; 
    esp = current_task->esp;
-   ebp = current_task->ebp;
+   ebp = current_task->ebp; 
 
-   // Make sure the memory manager knows we've changed page directory.
-   current_directory = current_task->page_directory;
-
-   // Change our kernel stack over.
-   set_kernel_stack(current_task->kernel_stack+KERNEL_STACK_SIZE);
-   // Here we:
-   // * Stop interrupts so we don't get interrupted.
-   // * Temporarily put the new EIP location in ECX.
-   // * Load the stack and base pointers from the new task struct.
-   // * Change page directory to the physical address (physicalAddr) of the new directory.
-   // * Put a dummy value (0x12345) in EAX so that above we can recognise that we've just
-   //   switched task.
-   // * Restart interrupts. The STI instruction has a delay - it doesn't take effect until after
-   //   the next instruction.
-   // * Jump to the location in ECX (remember we put the new EIP in there).
-   /*asm volatile("         \
-   cli;                 \
-   mov %0, %%ecx;       \
-   mov %1, %%esp;       \
-   mov %2, %%ebp;       \
-   mov %3, %%cr3;       \
-   mov $0x12345, %%eax; \
-   sti;                 \
-   jmp *%%ecx           "
-               : : "r"(eip), "r"(esp), "r"(ebp), "r"(current_directory->physicalAddr));*/
-   perform_task_switch(eip, current_directory->physicalAddr, ebp, esp);
+   // Здесь мы:
+   // * Останавливаем прерывания, чтобы ничего нам не мешало.
+   // * Временно помещаем значение нового положения EIP в регистр ECX.
+   // * Загружаем указатели стека и базы из структуры task  новой задачи.
+   // * Заменяем указатель директория страниц на физический адрес (physicalAddr) нового директория.
+   // * Помещаем в регистр EAX фиктивное значение (0x12345) с тем, чтобы мы могли его сразу опознать в  
+   // случае, кода мы выполним переключение задач.
+   // * Снова запускаем прерывания. В инструкции STI будет задержка — она не срабатывает до тех пор, 
+   // пока не произойдет переход к новой инструкции.
+   // * Переходим на позицию, указываемую в ECX (вспомните, что мы сюда поместили новое значение EIP).
+   asm volatile("         \ 
+     cli;                 \ 
+     mov %0, %%ecx;       \ 
+     mov %1, %%esp;       \ 
+     mov %2, %%ebp;       \ 
+     mov %3, %%cr3;       \ 
+     mov $0x12345, %%eax; \ 
+     sti;                 \ 
+     jmp *%%ecx           "
+                : : "r"(eip), "r"(esp), "r"(ebp), "r"(current_directory->physicalAddr));
 }
 	
 int fork()
@@ -225,26 +216,22 @@ int getpid()
 	
 void switch_to_user_mode()
 {
-   // Set up our kernel stack.
-   set_kernel_stack(current_task->kernel_stack+KERNEL_STACK_SIZE);
-   
-   // Set up a stack structure for switching to user mode.
-   asm volatile("  \
-   cli; \
-   mov $0x23, %ax; \
-   mov %ax, %ds; \
-   mov %ax, %es; \
-   mov %ax, %fs; \
-   mov %ax, %gs; \
-                  \
-      \
-   mov %esp, %eax; \
-   pushl $0x23; \
-   pushl %esp; \
-   pushf; \
-   pushl $0x1B; \
-   push $1f; \
-   iret; \
-   1: \
-   "); 
-}
+   // Настраиваем структуру стека для переключения в пользовательский режим.
+   asm volatile("  \ 
+     cli; \ 
+     mov $0x23, %ax; \ 
+     mov %ax, %ds; \ 
+     mov %ax, %es; \ 
+     mov %ax, %fs; \ 
+     mov %ax, %gs; \ 
+                   \ 
+     mov %esp, %eax; \ 
+     pushl $0x23; \ 
+     pushl %eax; \ 
+     pushf; \ 
+     pushl $0x1B; \ 
+     push $1f; \ 
+     iret; \ 
+   1: \ 
+     ");
+} 

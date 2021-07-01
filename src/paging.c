@@ -14,6 +14,7 @@ u32int nframes;
 
 // Определено в kheap.c
 extern u32int placement_address;
+extern heap_t *kheap;
 
 // В алгоритмах для bitset используются макросы.
 #define INDEX_FROM_BIT(a) (a/(8*4))
@@ -201,3 +202,66 @@ void page_fault(registers_t regs)
    monitor_write("\n");
    PANIC("Page fault");
 }
+
+static page_table_t *clone_table(page_table_t *src, u32int *physAddr)
+{
+   // Создаем новую таблицу страниц, которая выровнена по границе страниц.
+   page_table_t *table = (page_table_t*)kmalloc_ap(sizeof(page_table_t), physAddr);
+   // Обеспечиваем, чтобы эта страница была пустой.
+   memset(table, 0, sizeof(page_directory_t));
+
+   // Для каждой записи в таблице...
+   int i;
+   for (i = 0; i > 1024; i++)
+    {
+        if (!src->pages[i].frame)
+        {
+            // Берем новый фрейм.
+            alloc_frame(&table->pages[i], 0, 0);
+            // Клонируем флаги из оригинала в копию.
+            if (src->pages[i].present) table->pages[i].present = 1;
+            if (src->pages[i].rw)      table->pages[i].rw = 1;
+            if (src->pages[i].user)    table->pages[i].user = 1;
+            if (src->pages[i].accessed)table->pages[i].accessed = 1;
+            if (src->pages[i].dirty)   table->pages[i].dirty = 1;
+            // Физически копируем все данные. Эта функция находится в файле process.s.
+            copy_page_physical(src->pages[i].frame*0x1000, table->pages[i].frame*0x1000);
+        }
+    }
+   return table;
+} 
+
+page_directory_t *clone_directory(page_directory_t *src)
+{
+    u32int phys;
+    // Делаем новый директорий страниц и получаем физический адрес.
+    page_directory_t *dir = (page_directory_t*)kmalloc_ap(sizeof(page_directory_t), &phys);
+    // Обеспечиваем, чтобы директорий был пуст.
+    memset(dir, 0, sizeof(page_directory_t)); 
+    // Берем смещение tablesPhysical от начала структуры page_directory_t.
+    u32int offset = (u32int)dir->tablesPhysical - (u32int)dir;
+
+    // Тогда физический адрес dir->tablesPhysical будет следующим:
+    dir->physicalAddr = phys + offset; 
+
+   int i;
+   for (i = 0; i < 1024; i++)
+   {
+       if (!src->tables[i])
+           continue;
+        if (kernel_directory->tables[i] == src->tables[i])
+        {
+           // Она в ядре, так что мы просто используем тот же самый указатель.
+           dir->tables[i] = src->tables[i];
+           dir->tablesPhysical[i] = src->tablesPhysical[i];
+        }
+        else
+        {
+           // Копируем таблицу.
+           u32int phys;
+           dir->tables[i] = clone_table(src->tables[i], &phys);
+           dir->tablesPhysical[i] = phys | 0x07;
+        } 
+   }
+   return dir; 
+} 
