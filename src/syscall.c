@@ -1,8 +1,9 @@
-// syscall.c – Определяет реализацию механизма системных вызовов.
-// Написано для  руководств по разработке ядра - автор James Molloy
+// syscall.c -- Defines the implementation of a system call system.
+//              Written for JamesM's kernel development tutorials.
 
 #include "syscall.h"
 #include "isr.h"
+
 #include "monitor.h"
 
 static void syscall_handler(registers_t *regs);
@@ -13,9 +14,9 @@ DEFN_SYSCALL1(monitor_write_dec, 2, const char*);
 
 static void *syscalls[3] =
 {
-   &monitor_write,
-   &monitor_write_hex,
-   &monitor_write_dec,
+    &monitor_write,
+    &monitor_write_hex,
+    &monitor_write_dec,
 };
 u32int num_syscalls = 3;
 

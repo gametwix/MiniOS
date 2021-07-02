@@ -1,6 +1,6 @@
-// ordered_array.h – Интерфейс создания упорядоченного массива и 
-// добавления к нему или удаления из него элементов.
-// Написано для  руководств по разработке ядра - автор James Molloy
+// ordered_array.h -- Interface for creating, inserting and deleting
+//                    from ordered arrays.
+//                    Written for JamesM's kernel development tutorials.
 
 #ifndef ORDERED_ARRAY_H
 #define ORDERED_ARRAY_H
@@ -8,53 +8,51 @@
 #include "common.h"
 
 /**
-Сортировка этого массива происходит при вставке элементов — он всегда будет отсортирован 
-(между двумя последовательными к нему обращениями)
-В нем можно хранить все, что угодно; тип хранящихся объектов определяется как void*,
-поэтому можно хранить u32int или какой-нибудь другой указатель .
+   This array is insertion sorted - it always remains in a sorted state (between calls).
+   It can store anything that can be cast to a void* -- so a u32int, or any pointer.
 **/
 typedef void* type_t;
 /**
- Предикат должен возвращать ненулевое значение в случае, если первый аргумент меньше, 
-чем второй. В противном случае должно быть возвращено нулевое значение. 
+   A predicate should return nonzero if the first argument is less than the second. Else 
+   it should return zero.
 **/
 typedef s8int (*lessthan_predicate_t)(type_t,type_t);
 typedef struct
 {
-   type_t *array;
-   u32int size;
-   u32int max_size;
-   lessthan_predicate_t less_than;
+    type_t *array;
+    u32int size;
+    u32int max_size;
+    lessthan_predicate_t less_than;
 } ordered_array_t;
 
 /**
-  Стандартный предикат less than (меньше, чем)
+   A standard less than predicate.
 **/
 s8int standard_lessthan_predicate(type_t a, type_t b);
 
 /**
- Создание упорядоченного массива
+   Create an ordered array.
 **/
 ordered_array_t create_ordered_array(u32int max_size, lessthan_predicate_t less_than);
 ordered_array_t place_ordered_array(void *addr, u32int max_size, lessthan_predicate_t less_than);
 
 /**
-  Уничтожение упорядоченного массива
+   Destroy an ordered array.
 **/
 void destroy_ordered_array(ordered_array_t *array);
 
 /**
-  Добавление элемента в массив
+   Add an item into the array.
 **/
 void insert_ordered_array(type_t item, ordered_array_t *array);
 
 /**
-Поиск элемента по индексу i.
+   Lookup the item at index i.
 **/
 type_t lookup_ordered_array(u32int i, ordered_array_t *array);
 
 /**
-  Удаление из массива элемента, расположенного по индексу i
+   Deletes the item at location i from the array.
 **/
 void remove_ordered_array(u32int i, ordered_array_t *array);
 

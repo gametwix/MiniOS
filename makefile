@@ -43,6 +43,7 @@ image:
 	@mkdir tempdir/boot
 	@cp -r grub tempdir/boot/
 	@cp ./src/MiniOS.bin tempdir/
+	@cp ./initrd.img tempdir/
 	@sleep 1
 	@umount /dev/loop2
 	@rm -r tempdir

@@ -1,3 +1,8 @@
+// kheap.c -- Kernel heap functions, also provides
+//            a placement malloc() for use before the heap is 
+//            initialised.
+//            Written for JamesM's kernel development tutorials.
+
 #include "kheap.h"
 #include "paging.h"
 
@@ -5,118 +10,7 @@
 extern u32int end;
 u32int placement_address = (u32int)&end;
 extern page_directory_t *kernel_directory;
-heap_t *kheap = 0;
-
-
-static s32int find_smallest_hole(u32int size, u8int page_align, heap_t *heap)
-{
-   // Находим наименьший свободный фрагмент, который подходит.
-   u32int iterator = 0;
-   while (iterator < heap->index.size)
-   {
-       header_t *header = (header_t *)lookup_ordered_array(iterator, &heap->index);
-       // Если пользователь запросил память, которая выровнена по границе
-       if (page_align > 0)
-       {
-           // Выравниваем по границе начало заголовка.
-           u32int location = (u32int)header;
-           s32int offset = 0;
-           if ((location+sizeof(header_t)) & 0xFFFFF000 != 0)
-               offset = 0x1000 /* размер страницы */  - (location+sizeof(header_t))%0x1000;
-           s32int hole_size = (s32int)header->size - offset;
-           // Теперь подходит?
-           if (hole_size >= (s32int)size)
-               break;
-       }
-       else if (header->size >= size)
-           break;
-       iterator++;
-   }
-   // Когда выходить из цикла?
-   if (iterator == heap->index.size)
-       return -1; // Мы дошли до конца и ничего не нашли. 
-   else
-       return iterator;
-}
-
-static s8int header_t_less_than(void*a, void *b)
-{
-   return (((header_t*)a)->size < ((header_t*)b)->size)?1:0;
-}
-
-heap_t *create_heap(u32int start, u32int end_addr, u32int max, u8int supervisor, u8int readonly)
-{
-   heap_t *heap = (heap_t*)kmalloc(sizeof(heap_t));
-
-   // Мы предполагаем, что startAddress и endAddress выровнены по границе страниц.
-   ASSERT(start%0x1000 == 0);
-   ASSERT(end_addr%0x1000 == 0);
-
-   // Инициализируем список индексов.
-   heap->index = place_ordered_array( (void*)start, HEAP_INDEX_SIZE, &header_t_less_than);
-
-   // Сдвигаем начальный адрес вперед, куда мы можем начать помещать данные.
-   start += sizeof(type_t)*HEAP_INDEX_SIZE;
-
-   // Обесчьте, чтобы начальный адрес был выровнен по границе страниц.
-   if (start & 0xFFFFF000 != 0)
-   {
-       start &= 0xFFFFF000;
-       start += 0x1000;
-   }
-   // Запишите начальный, конечный и максимальный адреса в структуру памяти типа куча. 
-   heap->start_address = start;
-   heap->end_address = end_addr;
-   heap->max_address = max;
-   heap->supervisor = supervisor;
-   heap->readonly = readonly;
-
-   // Мы начинаем с одного большого фрагмента свободной памяти, указанной в списке индексов.
-   header_t *hole = (header_t *)start;
-   hole->size = end_addr-start;
-   hole->magic = HEAP_MAGIC;
-   hole->is_hole = 1;
-   insert_ordered_array((void*)hole, &heap->index);
-
-   return heap;
-} 
-
-u32int kmalloc(u32int sz)
-{
-    u32int tmp = placement_address;
-    placement_address += sz;
-    return tmp;
-} 
-
-// u32int kmalloc(u32int sz, int align)
-// {
-//     if (align == 1 && (placement_address & 0xFFFFF000)) // Если адрес еще не выровнен по границе страниц
-//     {
-//         // Align it.
-//         placement_address &= 0xFFFFF000;
-//         placement_address += 0x1000;
-//     }
-//     u32int tmp = placement_address;
-//     placement_address += sz;
-//     return tmp;
-// }
-
-// u32int kmalloc(u32int sz, int align, u32int *phys)
-// {
-//     if (align == 1 && (placement_address & 0xFFFFF000)) // Если адрес еще не выровнен по границе страниц
-//     {
-//         // Align it.
-//         placement_address &= 0xFFFFF000;
-//         placement_address += 0x1000;
-//     }
-//     if (phys)
-//     {
-//         *phys = placement_address;
-//     }
-//     u32int tmp = placement_address;
-//     placement_address += sz;
-//     return tmp;
-// } 
+heap_t *kheap=0;
 
 u32int kmalloc_int(u32int sz, int align, u32int *phys)
 {
@@ -126,7 +20,7 @@ u32int kmalloc_int(u32int sz, int align, u32int *phys)
         if (phys != 0)
         {
             page_t *page = get_page((u32int)addr, 0, kernel_directory);
-            *phys = page->frame*0x1000 + (u32int)addr&0xFFF;
+            *phys = page->frame*0x1000 + ((u32int)addr&0xFFF);
         }
         return (u32int)addr;
     }
@@ -166,6 +60,11 @@ u32int kmalloc_p(u32int sz, u32int *phys)
 u32int kmalloc_ap(u32int sz, u32int *phys)
 {
     return kmalloc_int(sz, 1, phys);
+}
+
+u32int kmalloc(u32int sz)
+{
+    return kmalloc_int(sz, 0, 0);
 }
 
 static void expand(u32int new_size, heap_t *heap)
@@ -222,6 +121,79 @@ static u32int contract(u32int new_size, heap_t *heap)
 
     heap->end_address = heap->start_address + new_size;
     return new_size;
+}
+
+static s32int find_smallest_hole(u32int size, u8int page_align, heap_t *heap)
+{
+    // Find the smallest hole that will fit.
+    u32int iterator = 0;
+    while (iterator < heap->index.size)
+    {
+        header_t *header = (header_t *)lookup_ordered_array(iterator, &heap->index);
+        // If the user has requested the memory be page-aligned
+        if (page_align > 0)
+        {
+            // Page-align the starting point of this header.
+            u32int location = (u32int)header;
+            s32int offset = 0;
+            if ((location+sizeof(header_t)) & 0xFFFFF000 != 0)
+                offset = 0x1000 /* page size */  - (location+sizeof(header_t))%0x1000;
+            s32int hole_size = (s32int)header->size - offset;
+            // Can we fit now?
+            if (hole_size >= (s32int)size)
+                break;
+        }
+        else if (header->size >= size)
+            break;
+        iterator++;
+    }
+    // Why did the loop exit?
+    if (iterator == heap->index.size)
+        return -1; // We got to the end and didn't find anything.
+    else
+        return iterator;
+}
+
+static s8int header_t_less_than(void*a, void *b)
+{
+    return (((header_t*)a)->size < ((header_t*)b)->size)?1:0;
+}
+
+heap_t *create_heap(u32int start, u32int end_addr, u32int max, u8int supervisor, u8int readonly)
+{
+    heap_t *heap = (heap_t*)kmalloc(sizeof(heap_t));
+
+    // All our assumptions are made on startAddress and endAddress being page-aligned.
+    ASSERT(start%0x1000 == 0);
+    ASSERT(end_addr%0x1000 == 0);
+    
+    // Initialise the index.
+    heap->index = place_ordered_array( (void*)start, HEAP_INDEX_SIZE, &header_t_less_than);
+    
+    // Shift the start address forward to resemble where we can start putting data.
+    start += sizeof(type_t)*HEAP_INDEX_SIZE;
+
+    // Make sure the start address is page-aligned.
+    if (start & 0xFFFFF000 != 0)
+    {
+        start &= 0xFFFFF000;
+        start += 0x1000;
+    }
+    // Write the start, end and max addresses into the heap structure.
+    heap->start_address = start;
+    heap->end_address = end_addr;
+    heap->max_address = max;
+    heap->supervisor = supervisor;
+    heap->readonly = readonly;
+
+    // We start off with one large hole in the index.
+    header_t *hole = (header_t *)start;
+    hole->size = end_addr-start;
+    hole->magic = HEAP_MAGIC;
+    hole->is_hole = 1;
+    insert_ordered_array((void*)hole, &heap->index);     
+
+    return heap;
 }
 
 void *alloc(u32int size, u8int page_align, heap_t *heap)
@@ -434,5 +406,3 @@ void free(void *p, heap_t *heap)
         insert_ordered_array((void*)header, &heap->index);
 
 }
-
-

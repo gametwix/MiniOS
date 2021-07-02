@@ -24,10 +24,4 @@ typedef struct
 // and returns a completed filesystem node.
 fs_node_t *initialise_initrd(u32int location);
 
-initrd_header_t *initrd_header;     // The header.
-initrd_file_header_t *file_headers; // The list of file headers.
-fs_node_t *initrd_root;             // Our root directory node.
-fs_node_t *initrd_dev;              // We also add a directory node for /dev, so we can mount devfs later on.
-fs_node_t *root_nodes;              // List of file nodes.
-int nroot_nodes;                    // Number of file nodes.
 #endif

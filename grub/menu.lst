@@ -4,3 +4,4 @@ default 0
 title	MiniOS
 	root (hd0,0)
 	kernel /MiniOS.bin
+	module /initrd.img

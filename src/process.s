@@ -1,36 +1,37 @@
 [GLOBAL read_eip]
 read_eip:
-  pop eax
-  jmp eax 
+    pop eax                     ; Get the return address
+    jmp eax                     ; Return. Can't use RET because return
+                                ; address popped off the stack. 
 
 [GLOBAL copy_page_physical]
 copy_page_physical:
-   push ebx              ; Согласно to __cdecl мы должны сохранить содержимое EBX.
-   pushf                 ; помещаем в стек EFLAGS с тем, чтобы могли оттуда забрать и заново включить прерывания
-                         ; Далее, если прерывания по какой-либо причине были включены.
-   cli                   ; Отключаем прерывания, теперь наши действия прерываться не будут.
-                         ; ПЕРЕД тем, как страничная организация памяти будет отключена, загружаем!
-   mov ebx, [esp+12]     ; адрес, откуда делается копирование
-   mov ecx, [esp+16]     ; адрес, куда выполняется копирование
-
-   mov edx, cr0          ; Берем регистр управления ...
-   and edx, 0x7fffffff   ; и ...
-   mov cr0, edx          ; отключаем страничную организацию памяти.
-
-   mov edx, 1024         ; 1024*4 байтов = копируется 4096 байтов
-
+    push ebx              ; According to __cdecl, we must preserve the contents of EBX.
+    pushf                 ; push EFLAGS, so we can pop it and reenable interrupts
+                          ; later, if they were enabled anyway.
+    cli                   ; Disable interrupts, so we aren't interrupted.
+                          ; Load these in BEFORE we disable paging!
+    mov ebx, [esp+12]     ; Source address
+    mov ecx, [esp+16]     ; Destination address
+  
+    mov edx, cr0          ; Get the control register...
+    and edx, 0x7fffffff   ; and...
+    mov cr0, edx          ; Disable paging.
+  
+    mov edx, 1024         ; 1024*4bytes = 4096 bytes
+  
 .loop:
-   mov eax, [ebx]        ; Берем слово из адреса, откуда делается копирование
-   mov [ecx], eax        ; Запоминаем его по адреса, куда выполняется копирование
-   add ebx, 4            ; Адрес источника копирования += sizeof(word)
-   add ecx, 4            ; Адрес, куда делается копирование += sizeof(word)
-   dec edx               ; Осталось скопировать на одно слово меньше
-   jnz .loop
-
-   mov edx, cr0          ; Снова берем регистр управления
-   or  edx, 0x80000000   ; и ...
-   mov cr0, edx          ; включаем страничное управление памятью.
-
-   popf                  ; Выталкиваем из стека EFLAGS.
-   pop ebx               ; Помещаем исходное значение обратно в EBX.
-   ret 
+    mov eax, [ebx]        ; Get the word at the source address
+    mov [ecx], eax        ; Store it at the dest address
+    add ebx, 4            ; Source address += sizeof(word)
+    add ecx, 4            ; Dest address += sizeof(word)
+    dec edx               ; One less word to do
+    jnz .loop             
+  
+    mov edx, cr0          ; Get the control register again
+    or  edx, 0x80000000   ; and...
+    mov cr0, edx          ; Enable paging.
+  
+    popf                  ; Pop EFLAGS back.
+    pop ebx               ; Get the original value of EBX back.
+    ret
