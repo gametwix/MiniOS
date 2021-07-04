@@ -27,11 +27,11 @@ int main(struct multiboot *mboot_ptr, u32int initial_stack)
     init_timer(50);
 
     // Find the location of our initial ramdisk.
-    ASSERT(mboot_ptr->mods_count > 0);
-    u32int initrd_location = *((u32int*)mboot_ptr->mods_addr);
-    u32int initrd_end = *(u32int*)(mboot_ptr->mods_addr+4);
+    //ASSERT(mboot_ptr->mods_count > 0);
+    //u32int initrd_location = *((u32int*)mboot_ptr->mods_addr);
+    //u32int initrd_end = *(u32int*)(mboot_ptr->mods_addr+4);
     // Don't trample our module with placement accesses, please!
-    placement_address = initrd_end;
+    //placement_address = initrd_end;
 
     // Start paging.
     initialise_paging();
@@ -40,13 +40,13 @@ int main(struct multiboot *mboot_ptr, u32int initial_stack)
     initialise_tasking();
 
     // Initialise the initial ramdisk, and set it as the filesystem root.
-    fs_root = initialise_initrd(initrd_location);
+    //fs_root = initialise_initrd(initrd_location);
 
     initialise_syscalls();
 
-    switch_to_user_mode();
+    monitor_write("Hello, kernel (protected) world!\n");
 
-    //asm volatile("int $0x0");
+    switch_to_user_mode();
 
     syscall_monitor_write("Hello, user world!\n");
 
@@ -55,15 +55,4 @@ int main(struct multiboot *mboot_ptr, u32int initial_stack)
     syscall_monitor_write("Hello, user world!\n");
 
     return 0;
-
-   /*
-   init_descriptor_tables();
-   monitor_clear();
-   monitor_write("Hello, world!\n");
-   asm volatile("int $0x3");
-   asm volatile("int $0x4");
-   asm volatile("sti");
-   init_timer(10);
-   return 0;
-   */
 }
