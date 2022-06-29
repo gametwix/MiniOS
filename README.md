@@ -183,7 +183,7 @@ Comments
 1
 </td>
 <td>
-<code>
+ 
 
 init_descriptor_tables(); <br>
 asm volatile("sti"); <br>
@@ -191,7 +191,7 @@ init_timer(50); <br>
 initialise_paging(); <br>
 initialise_tasking(); <br>
 initialise_syscalls(); <br>
-</code>
+ 
 </td>
 <td>
 Initialization of gdt and idt tables, timer, memory paging, multitasking, system calls. 
@@ -203,10 +203,10 @@ Initialization of gdt and idt tables, timer, memory paging, multitasking, system
 2
 </td>
 <td>
-<code>
+ 
 
 set_kernel_stack(current_task->kernel_stack+KERNEL_STACK_SIZE);
-</code>
+ 
 </td>
 <td>
 Set the start of the kernel stack right after the process stack. 
@@ -218,10 +218,10 @@ Set the start of the kernel stack right after the process stack.
 3.1
 </td>
 <td>
-<code>
+ 
 
 asm volatile(“cli”);
-</code>
+ 
 </td>
 <td>
 The processor stops processing interrupts.
@@ -233,7 +233,7 @@ The processor stops processing interrupts.
 3.2
 </td>
 <td>
-<code>
+ 
 
 asm volatile(  <br>
       mov $0x23, %ax;  <br>
@@ -251,7 +251,7 @@ asm volatile(  <br>
     1:  <br>
       ");
 
-</code>
+ 
 </td>
 <td>
 Set registers to run state in user segment
@@ -263,13 +263,13 @@ Set registers to run state in user segment
 3.3
 </td>
 <td>
-<code>
+ 
 
 pop %eax;  <br>
 or $0x200, %eax;  <br>
 push %eax; 
 
-</code>
+ 
 </td>
 <td>
 Enable interrupts
@@ -281,7 +281,7 @@ Enable interrupts
 4
 </td>
 <td>
-<code>
+ 
 
 isr_common_stub:
     pusha  <br>
@@ -297,7 +297,7 @@ isr_common_stub:
      <br>
     call irq_handler
 
-</code>
+ 
 </td>
 <td>
 TSS switch cs and esp. Handling an interrupt.
@@ -309,7 +309,7 @@ TSS switch cs and esp. Handling an interrupt.
 5
 </td>
 <td>
-<code>
+ 
 
 void syscall_handler(registers_t *regs) {  <br>
     if (regs->eax >= num_syscalls)  <br>
@@ -333,7 +333,7 @@ void syscall_handler(registers_t *regs) {  <br>
 }
 
 
-</code>
+ 
 </td>
 <td>
 Processing the system call (using the necessary pointer to the system function)
@@ -345,7 +345,7 @@ Processing the system call (using the necessary pointer to the system function)
 6
 </td>
 <td>
-<code>
+ 
 
 pop ebx  <br>
     mov ds, bx  <br>
@@ -358,7 +358,7 @@ pop ebx  <br>
     sti  <br>
     iret  <br>
 
-</code>
+ 
 </td>
 <td>
 We return the old state of the registers. With the help of iret we return the old cs and esp.
