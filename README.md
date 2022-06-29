@@ -185,12 +185,12 @@ Comments
 <td>
 <code>
 
-init_descriptor_tables(); 
-asm volatile("sti"); 
-init_timer(50); 
-initialise_paging(); 
-initialise_tasking(); 
-initialise_syscalls(); 
+init_descriptor_tables(); <br>
+asm volatile("sti"); <br>
+init_timer(50); <br>
+initialise_paging(); <br>
+initialise_tasking(); <br>
+initialise_syscalls(); <br>
 </code>
 </td>
 <td>
@@ -235,20 +235,20 @@ The processor stops processing interrupts.
 <td>
 <code>
 
-asm volatile(  
-      mov $0x23, %ax;  
-      mov %ax, %ds;  
-      mov %ax, %es;  
-      mov %ax, %fs;  
-      mov %ax, %gs;  
-      mov %esp, %eax;  
-      pushl $0x23;  
-      pushl %esp;  
-      pushf;  
-      pushl $0x1B;  
-      push $1f;  
-      iret;  
-    1:  
+asm volatile(  <br>
+      mov $0x23, %ax;  <br>
+      mov %ax, %ds;  <br>
+      mov %ax, %es;  <br>
+      mov %ax, %fs;  <br>
+      mov %ax, %gs;  <br>
+      mov %esp, %eax;  <br>
+      pushl $0x23;  <br>
+      pushl %esp;  <br>
+      pushf;  <br>
+      pushl $0x1B;  <br>
+      push $1f;  <br>
+      iret;  <br>
+    1:  <br>
       ");
 
 </code>
@@ -265,8 +265,8 @@ Set registers to run state in user segment
 <td>
 <code>
 
-pop %eax;  
-or $0x200, %eax;  
+pop %eax;  <br>
+or $0x200, %eax;  <br>
 push %eax; 
 
 </code>
@@ -284,17 +284,17 @@ Enable interrupts
 <code>
 
 isr_common_stub:
-    pusha  
-     
-    mov ax, ds  
-    push eax   
-     
-    mov ax, 0x10  
-    mov ds, ax  
-    mov es, ax  
-    mov fs, ax  
-    mov gs, ax  
-     
+    pusha  <br>
+     <br>
+    mov ax, ds  <br>
+    push eax   <br>
+     <br>
+    mov ax, 0x10  <br>
+    mov ds, ax  <br>
+    mov es, ax  <br>
+    mov fs, ax  <br>
+    mov gs, ax  <br>
+     <br>
     call irq_handler
 
 </code>
@@ -311,25 +311,25 @@ TSS switch cs and esp. Handling an interrupt.
 <td>
 <code>
 
-void syscall_handler(registers_t *regs) {  
-    if (regs->eax >= num_syscalls)  
-        return;  
-    void *location = syscalls[regs->eax];  
-    int ret;  
-    asm volatile ("  
-      push %1;  
-      push %2;  
-      push %3;  
-      push %4;  
-      push %5;  
-      call *%6;  
-      pop %%ebx;  
-      pop %%ebx;  
-      pop %%ebx;  
-      pop %%ebx;  
-      pop %%ebx;  
-    " : "=a" (ret) : "r" (regs->edi), "r"  (regs->esi), "r" (regs->edx), "r" (regs->ecx), "r" (regs->ebx), "r" (location)); 
-    regs->eax = ret; 
+void syscall_handler(registers_t *regs) {  <br>
+    if (regs->eax >= num_syscalls)  <br>
+        return;  <br>
+    void *location = syscalls[regs->eax];  <br>
+    int ret;  <br>
+    asm volatile ("  <br>
+      push %1;  <br>
+      push %2;  <br>
+      push %3;  <br>
+      push %4;  <br>
+      push %5;  <br>
+      call *%6;  <br>
+      pop %%ebx;  <br>
+      pop %%ebx;  <br>
+      pop %%ebx;  <br>
+      pop %%ebx;  <br>
+      pop %%ebx;  <br>
+    " : "=a" (ret) : "r" (regs->edi), "r"  (regs->esi), "r" (regs->edx), "r" (regs->ecx), "r" (regs->ebx), "r" (location)); <br>
+    regs->eax = ret; <br>
 }
 
 
@@ -347,16 +347,16 @@ Processing the system call (using the necessary pointer to the system function)
 <td>
 <code>
 
-pop ebx  
-    mov ds, bx  
-    mov es, bx  
-    mov fs, bx  
-    mov gs, bx  
-     
-    popa  
-    add esp, 8  
-    sti  
-    iret  
+pop ebx  <br>
+    mov ds, bx  <br>
+    mov es, bx  <br>
+    mov fs, bx  <br>
+    mov gs, bx  <br>
+     <br>
+    popa  <br>
+    add esp, 8  <br>
+    sti  <br>
+    iret  <br>
 
 </code>
 </td>
